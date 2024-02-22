@@ -4,7 +4,7 @@ namespace MyMakler.Controllers
 {
     [ApiController]
     [Route("[controller]")]
-    public class AdsWorkspace : ControllerBase
+    public class AdsWorkspace : ControllerBase//Работа с объявлениями
     {
         [HttpPost]
         [Route("Add")]
