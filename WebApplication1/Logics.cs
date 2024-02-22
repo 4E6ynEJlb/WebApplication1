@@ -1,16 +1,17 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using System.ComponentModel;
 using System.Net.Mime;
+using static Microsoft.Extensions.Logging.EventSource.LoggingEventSource;
 
 namespace MyMakler
 {
     public static class Logics
     {
-        public const int AdsMaxCount = 5;
-        public const int AdLifeDays = 10;
-        public enum SortCriteria { Rating, CreationDate }
-        public enum RatingChange { up, down }
-        public static void RemoveOldAds()
+        public const int AdsMaxCount = 5;//Максимальное кол-во объявлений для пользователя (игнорируется у админов (это не баг, а фича))
+        public const int AdLifeDays = 10;//Время жизни объявления в бд, устаревшие удаляются из бд каждую минуту (60000мс)
+        public enum SortCriteria { Rating, CreationDate }//Критерии сортировки
+        public enum RatingChange { up, down }//Возможные изменения рейтинга (+1/-1)
+        public static void RemoveOldAds()//Удаление устаревших объявлений
         {
             while (true)
             {
@@ -34,7 +35,7 @@ namespace MyMakler
                 }
             }
         }
-        public static async Task<bool> TryAddUser(User user)
+        public static async Task<bool> TryAddUser(User user)//Добавление пользователя
         {
             bool isSuccessful = true;
             Task task = new Task(() =>
@@ -57,7 +58,7 @@ namespace MyMakler
             await task;
             return isSuccessful;
         }
-        public static async Task<List<User>> TrySearchUser(string name)
+        public static async Task<List<User>> TrySearchUser(string name)//Поиск пользователя по имени (LIKE)
         {
             List<User> usersList = new List<User>();
             Task task = new Task(() =>
@@ -82,7 +83,7 @@ namespace MyMakler
             await task;
             return usersList;
         }
-        public static async Task<List<User>> TryGetUsersList()
+        public static async Task<List<User>> TryGetUsersList()//Все пользователи
         {
             List<User> usersList = new List<User>();
             Task task = new Task(() =>
@@ -103,7 +104,7 @@ namespace MyMakler
             await task;
             return usersList;
         }
-        public static async Task<bool> TryDeleteUser(Guid guid)
+        public static async Task<bool> TryDeleteUser(Guid guid)//Удаление пользователя по ИД
         {
             bool isSuccessful = true;
             Task task = new Task(() =>
@@ -127,7 +128,7 @@ namespace MyMakler
             await task;
             return isSuccessful;
         }
-        public static async Task<bool> TryEditUser(User user)
+        public static async Task<bool> TryEditUser(User user)//Изменение пользователя
         {
             bool isSuccessful = true;
             Task task = new Task(() =>
@@ -149,7 +150,7 @@ namespace MyMakler
             await task;
             return isSuccessful;
         }
-        public static async Task<bool> TryAddAdvertisement(Advertisement ad)
+        public static async Task<bool> TryAddAdvertisement(Advertisement ad)//Добавление объявления
         {
             bool isSuccessful = true;
             Task task = new Task(() =>
@@ -185,7 +186,7 @@ namespace MyMakler
             await task;
             return isSuccessful;
         }
-        public static async Task<bool> TryDeleteAdvertisement(Guid guid)
+        public static async Task<bool> TryDeleteAdvertisement(Guid guid) //Удаление объявления независимо от его актуальности
         {
             bool isSuccessful = true;
             Task task = new Task(() =>
@@ -209,7 +210,7 @@ namespace MyMakler
             await task;
             return isSuccessful;
         }
-        public static async Task<bool> TryEditAdvertisement(Advertisement ad)
+        public static async Task<bool> TryEditAdvertisement(Advertisement ad) //Редактирование объявления (с защитой от "нечестного" изменения рейтинга)
         {
             bool isSuccessful = true;
             Task task = new Task(() =>
@@ -233,8 +234,10 @@ namespace MyMakler
             await task;
             return isSuccessful;
         }
-        public static async Task<List<Advertisement>> TryGetAdsList(SortCriteria criterion, bool isASC)
+        public static async Task<List<Advertisement>> TryGetAdsList(SortCriteria criterion, bool isASC, string keyWord, int? ratingLow, int? ratingHigh) //Сортированный список объявлений с необязательным поиском по тексту и фильтром по рейтингу
         {
+            if (ratingHigh.HasValue && ratingLow.HasValue && ratingLow > ratingHigh)
+                (ratingLow, ratingHigh) = (ratingHigh, ratingLow);
             List<Advertisement> adsList = new List<Advertisement>();
             Task task = new Task(() =>
             {
@@ -252,6 +255,16 @@ namespace MyMakler
                                 break;
                         }
                     }
+                    if (keyWord != null)
+                        adsList = adsList.Where(a => EF.Functions.Like(a.Text, $"%{keyWord}%")).ToList();
+                    if (ratingLow.HasValue)
+                    {
+                        adsList = adsList.Where(a => a.Rating>=ratingLow).ToList();
+                    }
+                    if (ratingHigh.HasValue)
+                    {
+                        adsList = adsList.Where(a => a.Rating <= ratingHigh).ToList();
+                    }
                 }
                 catch
                 {
@@ -262,7 +275,7 @@ namespace MyMakler
             await task;
             return adsList;
         }
-        public static async Task<List<Advertisement>> TryGetPersonalAdsList(Guid guid)
+        public static async Task<List<Advertisement>> TryGetPersonalAdsList(Guid guid)//Поиск объявлений конкретного пользователя (по его ид)
         {
             List<Advertisement> adsList = new List<Advertisement>();
             Task task = new Task(() =>
@@ -283,7 +296,7 @@ namespace MyMakler
             await task;
             return adsList;
         }
-        public static async Task<bool> TryChangeRating(Guid guid, RatingChange change)
+        public static async Task<bool> TryChangeRating(Guid guid, RatingChange change)//Изменение (теперь уже "честное") рейтинга на 1 
         {
             bool isSuccessful = true;
             Task task = new Task(() =>
@@ -314,6 +327,6 @@ namespace MyMakler
             task.Start();
             await task;
             return isSuccessful;
-        }
+        }        
     }
 }

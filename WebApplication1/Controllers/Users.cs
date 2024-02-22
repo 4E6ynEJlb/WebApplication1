@@ -4,7 +4,7 @@ namespace MyMakler.Controllers
 {
     [ApiController]
     [Route("[controller]")]
-    public class Users : ControllerBase
+    public class Users : ControllerBase//Работа с пользователями
     {
         
         [HttpPost]

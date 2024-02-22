@@ -1,8 +1,6 @@
-﻿using Microsoft.Data.SqlClient;
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-using System.Text.Json.Serialization;
 
 namespace MyMakler
 {
@@ -81,14 +79,11 @@ namespace MyMakler
         
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
-            SqlConnectionStringBuilder connectionStringBuilder = new SqlConnectionStringBuilder()
-            {
-                DataSource = @"DESKTOP-1EUC064",
-                IntegratedSecurity = true,
-                TrustServerCertificate = true,
-                AttachDBFilename = @"D:\TestTaskDex\TTPrimary.mdf"
-            };
-            optionsBuilder.UseSqlServer(connectionStringBuilder.ConnectionString);
+            string connectionString = @"Data Source=DESKTOP-1EUC064;
+                                        AttachDbFilename=D:\TestTaskDex\TTPrimary.mdf;
+                                        Integrated Security=True;
+                                        Trust Server Certificate=True";
+            optionsBuilder.UseSqlServer(connectionString);
         }
     }
 }
