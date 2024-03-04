@@ -1,7 +1,9 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using MyMakler.Controllers;
 using System.ComponentModel;
 using System.Net.Mime;
-using static Microsoft.Extensions.Logging.EventSource.LoggingEventSource;
 
 namespace MyMakler
 {
@@ -11,6 +13,44 @@ namespace MyMakler
         public const int AdLifeDays = 10;//Время жизни объявления в бд, устаревшие удаляются из бд каждую минуту (60000мс)
         public enum SortCriteria { Rating, CreationDate }//Критерии сортировки
         public enum RatingChange { up, down }//Возможные изменения рейтинга (+1/-1)
+        private const int PageSize = 10;
+        private const string PicsDirectory = "D:\\TestTaskDex\\Pics";
+        public static void EnsureDirectoryCreated()
+        {
+            DirectoryInfo drinfo = new DirectoryInfo(PicsDirectory);
+            if (!drinfo.Exists)
+            {
+                drinfo.Create();
+            }
+        }
+        public static void DeleteDetachedPics()
+        {
+            while (true)
+            {
+                try
+                {
+                    DirectoryInfo drinfo = new DirectoryInfo(PicsDirectory);
+                    FileInfo[] picsInfo = drinfo.GetFiles();
+                    using (ApplicationContext context = new ApplicationContext())
+                    {
+                        foreach (FileInfo picInfo in picsInfo)
+                        {
+                            if (context.Ads.FirstOrDefault(a => a.PicLink == picInfo.FullName) == null)
+                            {
+                                picInfo.Delete();
+                                Console.WriteLine("Pic has been deleted");
+                            }
+                        }
+                        Console.WriteLine("End of deletion");
+                    }
+                    Thread.Sleep(60000);
+                }
+                catch
+                {
+                    Console.WriteLine("Deletion error");
+                }
+            }
+        }
         public static void RemoveOldAds()//Удаление устаревших объявлений
         {
             while (true)
@@ -35,298 +75,225 @@ namespace MyMakler
                 }
             }
         }
-        public static async Task<bool> TryAddUser(User user)//Добавление пользователя
+        public static async Task<Guid> TryAddUser(User user)//Добавление пользователя
         {
-            bool isSuccessful = true;
-            Task task = new Task(() =>
+            user.Id = Guid.NewGuid();
+            using (ApplicationContext context = new ApplicationContext())
             {
-                try
-                {
-                    user.Id = Guid.NewGuid();
-                    using (ApplicationContext context = new ApplicationContext())
-                    {
-                        context.Users.Add(user);
-                        context.SaveChanges();
-                    }
-                }
-                catch
-                {
-                    isSuccessful = false;
-                }
-            });    
-            task.Start();
-            await task;
-            return isSuccessful;
+                context.Users.Add(user);
+                await context.SaveChangesAsync();
+            }
+            return user.Id;
         }
         public static async Task<List<User>> TrySearchUser(string name)//Поиск пользователя по имени (LIKE)
         {
-            List<User> usersList = new List<User>();
-            Task task = new Task(() =>
+            List<User> result;
+            using (ApplicationContext context = new ApplicationContext())
             {
-                try
-                {
-                    using (ApplicationContext context = new ApplicationContext())
-                    {
-                        var result = context.Users.Where(u =>  EF.Functions.Like(u.Name, $"%{name}%"));                        
-                        foreach (User user in result)
-                        {
-                            usersList.Add(user);
-                        }                        
-                    }
-                }
-                catch
-                {
-                    usersList = null;
-                }
-            });
-            task.Start();
-            await task;
+                result = await context.Users.Where(u => EF.Functions.Like(u.Name, $"%{name}%")).ToListAsync();
+            }
+            return result;
+        }
+        public static async Task<List<User>> TryGetUsersList(int pageNumber)//Все пользователи
+        {
+            List<User> usersList;
+            using (ApplicationContext context = new ApplicationContext())
+            {
+                int pagesCount = await context.Users.CountAsync();
+                if (pagesCount == 0)
+                    pagesCount = 1;
+                else pagesCount = pagesCount / PageSize + ((pagesCount % PageSize) == 0 ? 0 : 1);
+                if (pageNumber > pagesCount || pageNumber < 1)
+                    throw new InvalidPageException();
+                usersList = await context.Users.Skip((pageNumber - 1) * PageSize).Take(PageSize).ToListAsync();
+            }
             return usersList;
         }
-        public static async Task<List<User>> TryGetUsersList()//Все пользователи
+        public static async Task<int> TryGetUsersPagesCount()
         {
-            List<User> usersList = new List<User>();
-            Task task = new Task(() =>
+            int pagesCount;
+            using (ApplicationContext context = new ApplicationContext())
             {
-                try
-                {
-                    using (ApplicationContext context = new ApplicationContext())
-                    {
-                        usersList = context.Users.ToList();
-                    }
-                }
-                catch
-                {
-                    usersList = null;
-                }
-            });
-            task.Start();
-            await task;
-            return usersList;
+                pagesCount = await context.Users.CountAsync();
+            }
+            if (pagesCount == 0)
+                return 1;
+            return pagesCount / PageSize + ((pagesCount % PageSize) == 0 ? 0 : 1);
         }
-        public static async Task<bool> TryDeleteUser(Guid guid)//Удаление пользователя по ИД
+        public static async Task TryDeleteUser(Guid guid)//Удаление пользователя по ИД
         {
-            bool isSuccessful = true;
-            Task task = new Task(() =>
+            using (ApplicationContext context = new ApplicationContext())
             {
-                try
-                {
-                    using (ApplicationContext context = new ApplicationContext())
-                    {
-                        User user = new User { Id = guid };
-                        context.Users.Attach(user);
-                        context.Users.Remove(user);
-                        context.SaveChanges();
-                    }
-                }
-                catch
-                {
-                    isSuccessful = false;
-                }
-            });
-            task.Start();
-            await task;
-            return isSuccessful;
+                if (await context.Users.FirstOrDefaultAsync(u => u.Id == guid) == null)
+                    throw new DoesNotExistException(typeof(User));
+                User user = new User { Id = guid };
+                context.Users.Attach(user);
+                context.Users.Remove(user);
+                await context.SaveChangesAsync();
+            }
         }
-        public static async Task<bool> TryEditUser(User user)//Изменение пользователя
+        public static async Task TryEditUser(User user)//Изменение пользователя
         {
-            bool isSuccessful = true;
-            Task task = new Task(() =>
+            using (ApplicationContext context = new ApplicationContext())
             {
-                try
-                {
-                    using (ApplicationContext context = new ApplicationContext())
-                    {
-                        context.Users.Update(user);
-                        context.SaveChanges();
-                    }
-                }
-                catch
-                {
-                    isSuccessful = false;
-                }
-            });
-            task.Start();
-            await task;
-            return isSuccessful;
+                if (await context.Users.FirstOrDefaultAsync(u => u.Id == user.Id) == null)
+                    throw new DoesNotExistException(typeof(User));
+                context.Users.Update(user);
+                await context.SaveChangesAsync();
+            }
         }
-        public static async Task<bool> TryAddAdvertisement(Advertisement ad)//Добавление объявления
+        public static async Task<Guid> TryAddAdvertisement(Advertisement ad)//Добавление объявления
         {
-            bool isSuccessful = true;
-            Task task = new Task(() =>
+            Guid adId = Guid.NewGuid();
+            using (ApplicationContext context = new ApplicationContext())
             {
-                try
+                int thisUserAdsCount = await context.Ads.Where(a => a.UserId == ad.UserId).CountAsync();
+                bool isThisUserAdmin = context.Users.FirstOrDefault(u => u.Id == ad.UserId).IsAdmin;
+                if (thisUserAdsCount >= AdsMaxCount && !isThisUserAdmin)
                 {
-                    using (ApplicationContext context = new ApplicationContext())
-                    {
-                        var thisUserAds = context.Ads.Where(a => a.UserId == ad.UserId);
-                        bool isThisUserAdmin = context.Users.FirstOrDefault(u => u.Id == ad.UserId).IsAdmin;
-                        if (thisUserAds.Count<Advertisement>() >= AdsMaxCount && !isThisUserAdmin)
-                        {
-                            isSuccessful = false;
-                        }
-                        else
-                        {
-                            ad.User = null;
-                            ad.Id = Guid.NewGuid();
-                            ad.Rating = 0;
-                            ad.CreationDate = DateTime.Now;
-                            ad.DeletionDate = ad.CreationDate.AddDays(AdLifeDays);
-                            context.Ads.Add(ad);
-                            context.SaveChanges();
-                        }
-                    }
+                    throw new TooManyAdsException();
                 }
-                catch
-                {
-                    isSuccessful = false;
-                }
-            });
-            task.Start();
-            await task;
-            return isSuccessful;
+                if (await context.Users.FirstOrDefaultAsync(u => u.Id == ad.UserId) == null)
+                    throw new DoesNotExistException(typeof(User));
+                ad.User = null;
+                ad.Id = adId;
+                ad.Rating = 0;
+                ad.PicLink = "Empty";
+                ad.CreationDate = DateTime.Now;
+                ad.DeletionDate = ad.CreationDate.AddDays(AdLifeDays);
+                context.Ads.Add(ad);
+                await context.SaveChangesAsync();
+            }
+            return adId;
         }
-        public static async Task<bool> TryDeleteAdvertisement(Guid guid) //Удаление объявления независимо от его актуальности
+        public static async Task TryAttachPic(IFormFile file, Guid adId)
         {
-            bool isSuccessful = true;
-            Task task = new Task(() =>
+            using (ApplicationContext context = new ApplicationContext())
             {
-                try
+                Advertisement ad = await context.Ads.FirstOrDefaultAsync(a => a.Id == adId);
+                if (file == null)
+                    throw new EmptyFileException();
+                if (!file.ContentType.Contains("image"))
+                    throw new InvalidFileFormatException();
+                if (ad == null)
+                    throw new DoesNotExistException(typeof(Advertisement));
+                using (FileStream fS = new FileStream(PicsDirectory + "\\" + file.FileName, FileMode.Create))
                 {
-                    using (ApplicationContext context = new ApplicationContext())
-                    {
-                        Advertisement ad = new Advertisement { Id = guid };
-                        context.Ads.Attach(ad);
-                        context.Ads.Remove(ad);
-                        context.SaveChanges();
-                    }
+                    await file.CopyToAsync(fS);
                 }
-                catch
-                {
-                    isSuccessful = false;
-                }
-            });
-            task.Start();
-            await task;
-            return isSuccessful;
+                ad.PicLink = PicsDirectory + "\\" + file.FileName;
+                context.Ads.Update(ad);
+                await context.SaveChangesAsync();
+            }
         }
-        public static async Task<bool> TryEditAdvertisement(Advertisement ad) //Редактирование объявления (с защитой от "нечестного" изменения рейтинга)
+        public static async Task TryDetachPic(Guid adId)
         {
-            bool isSuccessful = true;
-            Task task = new Task(() =>
+            using (ApplicationContext context = new ApplicationContext())
             {
-                try
-                {
-                    using (ApplicationContext context = new ApplicationContext())
-                    {
-                        Advertisement adInDB = context.Ads.FirstOrDefault(a => a.Id == ad.Id);
-                        ad.Rating = adInDB.Rating;
-                        context.Ads.Update(ad);
-                        context.SaveChanges();
-                    }
-                }
-                catch
-                {
-                    isSuccessful = false;
-                }
-            });
-            task.Start();
-            await task;
-            return isSuccessful;
+                Advertisement ad = await context.Ads.FirstOrDefaultAsync(a => a.Id == adId);
+                if (ad == null)
+                    throw new DoesNotExistException(typeof(Advertisement));
+                ad.PicLink = "Empty";
+                context.Ads.Update(ad);
+                await context.SaveChangesAsync();
+            }
         }
-        public static async Task<List<Advertisement>> TryGetAdsList(SortCriteria criterion, bool isASC, string keyWord, int? ratingLow, int? ratingHigh) //Сортированный список объявлений с необязательным поиском по тексту и фильтром по рейтингу
+        public static async Task TryDeleteAdvertisement(Guid guid) //Удаление объявления независимо от его актуальности
+        {
+            using (ApplicationContext context = new ApplicationContext())
+            {
+                Advertisement ad = new Advertisement { Id = guid };
+                if (await context.Ads.FirstOrDefaultAsync(a => a.Id == guid) == null)
+                    throw new DoesNotExistException(typeof(Advertisement));
+                context.Ads.Attach(ad);
+                context.Ads.Remove(ad);
+                await context.SaveChangesAsync();
+            }
+        }
+        public static async Task TryEditAdvertisement(Advertisement ad) //Редактирование объявления (с защитой от "нечестного" изменения рейтинга)
+        {
+            using (ApplicationContext context = new ApplicationContext())
+            {
+                Advertisement adInDB = await context.Ads.FirstOrDefaultAsync(a => a.Id == ad.Id);
+                if (adInDB == null)
+                    throw new DoesNotExistException(typeof(Advertisement));
+                ad.Rating = adInDB.Rating;
+                ad.PicLink = adInDB.PicLink;
+                context.Ads.Update(ad);
+                await context.SaveChangesAsync();
+            }
+        }
+        public static async Task<AdsAndPagesCount> TryGetAdsListAndPgCount(SortCriteria criterion, bool isASC, string keyWord, int? ratingLow, int? ratingHigh, int pageNumber) //Сортированный список объявлений с необязательным поиском по тексту и фильтром по рейтингу
         {
             if (ratingHigh.HasValue && ratingLow.HasValue && ratingLow > ratingHigh)
                 (ratingLow, ratingHigh) = (ratingHigh, ratingLow);
-            List<Advertisement> adsList = new List<Advertisement>();
-            Task task = new Task(() =>
+            IQueryable<Advertisement> ads;
+            List<Advertisement> adsList;
+            int pagesCount = 0;
+            using (ApplicationContext context = new ApplicationContext())
             {
-                try
+                switch (criterion)
                 {
-                    using (ApplicationContext context = new ApplicationContext())
-                    {
-                        switch (criterion)
-                        {
-                            case SortCriteria.Rating:
-                                adsList = (isASC? context.Ads.OrderBy(a => a.Rating): context.Ads.OrderByDescending(a => a.Rating)).ToList();
-                                break;
-                            default: 
-                                adsList = (isASC ? context.Ads.OrderBy(a => a.CreationDate) : context.Ads.OrderByDescending(a => a.CreationDate)).ToList();
-                                break;
-                        }
-                    }
-                    if (keyWord != null)
-                        adsList = adsList.Where(a => EF.Functions.Like(a.Text, $"%{keyWord}%")).ToList();
-                    if (ratingLow.HasValue)
-                    {
-                        adsList = adsList.Where(a => a.Rating>=ratingLow).ToList();
-                    }
-                    if (ratingHigh.HasValue)
-                    {
-                        adsList = adsList.Where(a => a.Rating <= ratingHigh).ToList();
-                    }
+                    case SortCriteria.Rating:
+                        ads = (isASC ? context.Ads.OrderBy(a => a.Rating) : context.Ads.OrderByDescending(a => a.Rating));
+                        break;
+                    default:
+                        ads = (isASC ? context.Ads.OrderBy(a => a.CreationDate) : context.Ads.OrderByDescending(a => a.CreationDate));
+                        break;
                 }
-                catch
+                if (keyWord != null)
+                    ads = ads.Where(a => EF.Functions.Like(a.Text, $"%{keyWord}%"));
+                if (ratingLow.HasValue)
                 {
-                    adsList = null;
+                    ads = ads.Where(a => a.Rating >= ratingLow);
                 }
-            });
-            task.Start();
-            await task;
-            return adsList;
+                if (ratingHigh.HasValue)
+                {
+                    ads = ads.Where(a => a.Rating <= ratingHigh);
+                }
+                pagesCount = await ads.CountAsync();
+                if (pagesCount > 0)
+                    pagesCount = pagesCount / PageSize + ((pagesCount % PageSize) == 0 ? 0 : 1);
+                else
+                    pagesCount = 1;
+                if (pageNumber > pagesCount || pageNumber < 1)
+                    throw new InvalidPageException();
+                ads = ads.Skip((pageNumber - 1) * PageSize).Take(PageSize);
+                adsList = await ads.ToListAsync();
+            }
+            return new AdsAndPagesCount { Ads = adsList, PagesCount = pagesCount };
         }
         public static async Task<List<Advertisement>> TryGetPersonalAdsList(Guid guid)//Поиск объявлений конкретного пользователя (по его ид)
         {
-            List<Advertisement> adsList = new List<Advertisement>();
-            Task task = new Task(() =>
+            List<Advertisement> adsList;
+
+            using (ApplicationContext context = new ApplicationContext())
             {
-                try
-                {
-                    using (ApplicationContext context = new ApplicationContext())
-                    {
-                        adsList = context.Ads.Where(a => a.UserId == guid).ToList();
-                    }
-                }
-                catch
-                {
-                    adsList = null;
-                }
-            });
-            task.Start();
-            await task;
+                if (await context.Users.FirstOrDefaultAsync(u => u.Id == guid) == null)
+                    throw new DoesNotExistException(typeof(User));
+                adsList = await context.Ads.Where(a => a.UserId == guid).ToListAsync();
+            }
             return adsList;
         }
-        public static async Task<bool> TryChangeRating(Guid guid, RatingChange change)//Изменение (теперь уже "честное") рейтинга на 1 
+        public static async Task TryChangeRating(Guid guid, RatingChange change)//Изменение (теперь уже "честное") рейтинга на 1 
         {
-            bool isSuccessful = true;
-            Task task = new Task(() =>
+            using (ApplicationContext context = new ApplicationContext())
             {
-                try
+                Advertisement? ad = await context.Ads.FirstOrDefaultAsync(a => a.Id == guid);
+                if (ad == null)
+                    throw new DoesNotExistException(typeof(Advertisement));
+                switch (change)
                 {
-                    using (ApplicationContext context = new ApplicationContext())
-                    {
-                        Advertisement ad = context.Ads.FirstOrDefault(a => a.Id == guid);
-                        switch(change)
-                        {
-                            case RatingChange.up:
-                                ad.Rating++;
-                                break;
-                            default:
-                                ad.Rating--;
-                                break;
-                        }
-                        context.Ads.Update(ad);
-                        context.SaveChanges();
-                    }
+                    case RatingChange.up:
+                        ad.Rating++;
+                        break;
+                    default:
+                        ad.Rating--;
+                        break;
                 }
-                catch
-                {
-                    isSuccessful = false;
-                }
-            });
-            task.Start();
-            await task;
-            return isSuccessful;
-        }        
+                context.Ads.Update(ad);
+                await context.SaveChangesAsync();
+            }
+        }
     }
 }

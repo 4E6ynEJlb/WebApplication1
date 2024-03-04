@@ -9,42 +9,58 @@ namespace MyMakler.Controllers
         
         [HttpPost]
         [Route("Add")]
-        public async Task<bool> AddUser(User user)
+        public async Task<IActionResult> AddUser(User user)
         {
-            return await Logics.TryAddUser(user);
+            return Ok(await Logics.TryAddUser(user));
         }
 
-
+        
         [HttpGet]
         [Route("Search")]
-        public async Task<List<User>> SearchUser(string name)
+        public async Task<IActionResult> SearchUser(string name)
         {
-            return await Logics.TrySearchUser(name);
+            var result = await Logics.TrySearchUser(name);
+            if (result == null)
+                return NoContent();
+            return Ok(result);
+        }
+
+        
+        [HttpGet]
+        [Route("All")]
+        public async Task<IActionResult> GetAllUsers(int page = 1)
+        {
+            var result = await Logics.TryGetUsersList(page);
+            if (result == null)
+                return NoContent();
+            return Ok(result);
         }
 
 
         [HttpGet]
-        [Route("All")]
-        public async Task<List<User>> GetAllUsers()
+        [Route("PgCount")]
+        public async Task<IActionResult> GetUsersPagesCount()
         {
-            return await Logics.TryGetUsersList();
+            return Ok(await Logics.TryGetUsersPagesCount());
         }
 
 
         [HttpDelete]
         [Route("Delete")]
-        public async Task<bool> DeleteUser(Guid guid)
+        public async Task<IActionResult> DeleteUser(Guid guid)
         {
-            return await Logics.TryDeleteUser(guid);
+            await Logics.TryDeleteUser(guid);
+            return Ok();
         }
 
 
         [HttpPut]
         [Route("Edit")]
-        public async Task<bool> EditUser(User user)
+        public async Task<IActionResult> EditUser(User user)
         {
-            return await Logics.TryEditUser(user);
-        }        
+            await Logics.TryEditUser(user);
+            return Ok();
+        }    
     }
 }
 

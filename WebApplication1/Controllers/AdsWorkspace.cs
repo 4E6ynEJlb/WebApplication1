@@ -8,33 +8,55 @@ namespace MyMakler.Controllers
     {
         [HttpPost]
         [Route("Add")]
-        public async Task<bool> AddAdvertisement(Advertisement ad)
+        public async Task<IActionResult> AddAdvertisement(Advertisement ad)
         {
-            return await Logics.TryAddAdvertisement(ad);
+            return Ok(await Logics.TryAddAdvertisement(ad));
+        }
+
+        [HttpPost]
+        [Route("AttachPic")]
+        public async Task<IActionResult> AttachPicToAdvertisement(IFormFile file, Guid adId)
+        {
+            await Logics.TryAttachPic(file, adId);
+            return Ok();
+        }
+
+
+        [HttpDelete]
+        [Route("DetachPic")]
+        public async Task<IActionResult> AttachPicToAdvertisement(Guid adId)
+        {
+            await Logics.TryDetachPic(adId);
+            return Ok();
         }
 
 
         [HttpDelete]
         [Route("Delete")]
-        public async Task<bool> DeleteAdvertisement(Guid guid)
+        public async Task<IActionResult> DeleteAdvertisement(Guid guid)
         {
-            return await Logics.TryDeleteAdvertisement(guid);
+            await Logics.TryDeleteAdvertisement(guid);
+            return Ok();
         }
 
 
         [HttpPut]
         [Route("Edit")]
-        public async Task<bool> EditAdvertisement(Advertisement ad)
+        public async Task<IActionResult> EditAdvertisement(Advertisement ad)
         {
-            return await Logics.TryEditAdvertisement(ad);
+            await Logics.TryEditAdvertisement(ad);
+            return Ok();
         }
 
 
         [HttpGet]
         [Route("PersonalAds")]
-        public async Task<List<Advertisement>> AdsByUser(Guid guid)
+        public async Task<IActionResult> AdsByUser(Guid guid)
         {
-            return await Logics.TryGetPersonalAdsList(guid);
+            var result = await Logics.TryGetPersonalAdsList(guid);
+            if (result == null)
+                return NoContent();
+            return Ok(result);
         }
     }
 }

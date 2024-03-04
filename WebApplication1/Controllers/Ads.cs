@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using System.Net;
 
 namespace MyMakler.Controllers
 {
@@ -9,17 +10,26 @@ namespace MyMakler.Controllers
         
         [HttpGet]
         [Route("All")]
-        public async Task<List<Advertisement>> GetAllAds(Logics.SortCriteria criterion, bool isASC, string? keyWord, int? ratingLow, int? ratingHigh)
+        public async Task<IActionResult> GetAllAds(Logics.SortCriteria criterion, bool isASC, string? keyWord, int? ratingLow, int? ratingHigh, int page = 1)
         {
-            return await Logics.TryGetAdsList(criterion, isASC, keyWord, ratingLow, ratingHigh);
+            var result = await Logics.TryGetAdsListAndPgCount(criterion, isASC, keyWord, ratingLow, ratingHigh, page);
+            if (result.Ads == null)
+                return StatusCode((int)HttpStatusCode.NoContent, result.PagesCount);
+            return Ok(result);
         }
 
 
         [HttpPut]
         [Route("Rating")]
-        public async Task<bool> ChangeRating(Guid guid, Logics.RatingChange change)
+        public async Task<IActionResult> ChangeRating(Guid guid, Logics.RatingChange change)
         {
-            return await Logics.TryChangeRating(guid, change);
+                await Logics.TryChangeRating(guid, change);
+                return Ok();
         }        
+    }
+    public class AdsAndPagesCount
+    {
+        public List<Advertisement> Ads { get; set; }
+        public int PagesCount { get; set; }
     }
 }
