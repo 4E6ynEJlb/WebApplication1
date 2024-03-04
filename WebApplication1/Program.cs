@@ -7,6 +7,9 @@ namespace MyMakler
         {
             Task rOA = new Task(() => Logics.RemoveOldAds());
             rOA.Start();
+            Logics.EnsureDirectoryCreated();
+            Task dDP = new Task(() => Logics.DeleteDetachedPics());
+            dDP.Start();
             var builder = WebApplication.CreateBuilder(args);
 
             // Add services to the container.
@@ -24,7 +27,7 @@ namespace MyMakler
                 app.UseSwagger();
                 app.UseSwaggerUI();
             }
-
+            app.UseExceptionHandlerMiddleware();
             app.UseHttpsRedirection();
 
             app.UseAuthorization();

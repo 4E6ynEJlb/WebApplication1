@@ -4,6 +4,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace MyMakler
 {
+
     [Table("users")]
     public class User
     {
