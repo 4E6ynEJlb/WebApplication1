@@ -13,9 +13,11 @@ namespace MyMakler
         public DoesNotExistException(Type entityType)
         {
             if (entityType == typeof(Advertisement))
-                Message = "Advertisement does not exist";
+                Message = "Advertisement does not exists";
             else if (entityType == typeof(User))
-                Message = "User does not exist";
+                Message = "User does not exists";
+            else if (entityType == typeof(File))
+                Message = "File does not exists";
             else throw new Exception();
         }
         public new string Message;
@@ -54,27 +56,27 @@ namespace MyMakler
             }
             catch (TooManyAdsException tMAEx)
             {
-                await HandleTooManyAdsException(context, tMAEx).ConfigureAwait(false);
+                await HandleTooManyAdsException(context, tMAEx);
             }
             catch (EmptyFileException eFEx)
             {
-                await HandleEmptyFileException(context, eFEx).ConfigureAwait(false);
+                await HandleEmptyFileException(context, eFEx);
             }
             catch (InvalidFileFormatException iFFEx)
             {
-                await HandleInvalidFileFormatException(context, iFFEx).ConfigureAwait(false);
+                await HandleInvalidFileFormatException(context, iFFEx);
             }
             catch (InvalidPageException iPEx)
             {
-                await HandleInvalidPageException(context, iPEx).ConfigureAwait(false);
+                await HandleInvalidPageException(context, iPEx);
             }
             catch (DoesNotExistException dNEEx)
             {
-                await HandleDoesNotExistException(context, dNEEx).ConfigureAwait(false);
+                await HandleDoesNotExistException(context, dNEEx);
             }
             catch (Exception ex)
             {
-                await HandleUnknownException(context, ex).ConfigureAwait(false);
+                await HandleUnknownException(context, ex);
             }
         }
         private static Task HandleTooManyAdsException(HttpContext context, TooManyAdsException exception)

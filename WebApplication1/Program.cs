@@ -5,15 +5,11 @@ namespace MyMakler
     {
         public static void Main(string[] args)
         {
-            Task rOA = new Task(() => Logics.RemoveOldAds());
-            rOA.Start();
             Logics.EnsureDirectoryCreated();
-            Task dDP = new Task(() => Logics.DeleteDetachedPics());
-            dDP.Start();
             var builder = WebApplication.CreateBuilder(args);
 
             // Add services to the container.
-
+            builder.Services.AddHostedService<Services>();////////////////////////////////////////////
             builder.Services.AddControllers();
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
             builder.Services.AddEndpointsApiExplorer();

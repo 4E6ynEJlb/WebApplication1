@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using MyMakler.Controllers;
 using System.ComponentModel;
 using System.Net.Mime;
-
+using Aspose.Imaging;
 namespace MyMakler
 {
     public static class Logics
@@ -13,8 +13,7 @@ namespace MyMakler
         public const int AdLifeDays = 10;//Время жизни объявления в бд, устаревшие удаляются из бд каждую минуту (60000мс)
         public enum SortCriteria { Rating, CreationDate }//Критерии сортировки
         public enum RatingChange { up, down }//Возможные изменения рейтинга (+1/-1)
-        private const int PageSize = 10;
-        private const string PicsDirectory = "D:\\TestTaskDex\\Pics";
+        public const string PicsDirectory = "D:\\TestTaskDex\\Pics";
         public static void EnsureDirectoryCreated()
         {
             DirectoryInfo drinfo = new DirectoryInfo(PicsDirectory);
@@ -23,58 +22,7 @@ namespace MyMakler
                 drinfo.Create();
             }
         }
-        public static void DeleteDetachedPics()
-        {
-            while (true)
-            {
-                try
-                {
-                    DirectoryInfo drinfo = new DirectoryInfo(PicsDirectory);
-                    FileInfo[] picsInfo = drinfo.GetFiles();
-                    using (ApplicationContext context = new ApplicationContext())
-                    {
-                        foreach (FileInfo picInfo in picsInfo)
-                        {
-                            if (context.Ads.FirstOrDefault(a => a.PicLink == picInfo.FullName) == null)
-                            {
-                                picInfo.Delete();
-                                Console.WriteLine("Pic has been deleted");
-                            }
-                        }
-                        Console.WriteLine("End of deletion");
-                    }
-                    Thread.Sleep(60000);
-                }
-                catch
-                {
-                    Console.WriteLine("Deletion error");
-                }
-            }
-        }
-        public static void RemoveOldAds()//Удаление устаревших объявлений
-        {
-            while (true)
-            {
-                try
-                {
-                    using (ApplicationContext context = new ApplicationContext())
-                    {
-                        var removingAds = context.Ads.Where(a => a.DeletionDate <= DateTime.Now);
-                        foreach (Advertisement removingAd in removingAds)
-                        {
-                            context.Ads.Remove(removingAd);
-                            Console.WriteLine("Ad has been removed");
-                        }
-                        Console.WriteLine("End of removation");
-                    }
-                    Thread.Sleep(60000);
-                }
-                catch
-                {
-                    Console.WriteLine("Removation error");
-                }
-            }
-        }
+        
         public static async Task<Guid> TryAddUser(User user)//Добавление пользователя
         {
             user.Id = Guid.NewGuid();
@@ -94,7 +42,7 @@ namespace MyMakler
             }
             return result;
         }
-        public static async Task<List<User>> TryGetUsersList(int pageNumber)//Все пользователи
+        public static async Task<List<User>> TryGetUsersList(int pageNumber, int pageSize)//Все пользователи
         {
             List<User> usersList;
             using (ApplicationContext context = new ApplicationContext())
@@ -102,14 +50,14 @@ namespace MyMakler
                 int pagesCount = await context.Users.CountAsync();
                 if (pagesCount == 0)
                     pagesCount = 1;
-                else pagesCount = pagesCount / PageSize + ((pagesCount % PageSize) == 0 ? 0 : 1);
+                else pagesCount = pagesCount / pageSize + ((pagesCount % pageSize) == 0 ? 0 : 1);
                 if (pageNumber > pagesCount || pageNumber < 1)
                     throw new InvalidPageException();
-                usersList = await context.Users.Skip((pageNumber - 1) * PageSize).Take(PageSize).ToListAsync();
+                usersList = await context.Users.Skip((pageNumber - 1) * pageSize).Take(pageSize).ToListAsync();
             }
             return usersList;
         }
-        public static async Task<int> TryGetUsersPagesCount()
+        public static async Task<int> TryGetUsersPagesCount(int pageSize)
         {
             int pagesCount;
             using (ApplicationContext context = new ApplicationContext())
@@ -118,7 +66,7 @@ namespace MyMakler
             }
             if (pagesCount == 0)
                 return 1;
-            return pagesCount / PageSize + ((pagesCount % PageSize) == 0 ? 0 : 1);
+            return pagesCount / pageSize + ((pagesCount % pageSize) == 0 ? 0 : 1);
         }
         public static async Task TryDeleteUser(Guid guid)//Удаление пользователя по ИД
         {
@@ -148,7 +96,7 @@ namespace MyMakler
             using (ApplicationContext context = new ApplicationContext())
             {
                 int thisUserAdsCount = await context.Ads.Where(a => a.UserId == ad.UserId).CountAsync();
-                bool isThisUserAdmin = context.Users.FirstOrDefault(u => u.Id == ad.UserId).IsAdmin;
+                bool isThisUserAdmin = (await context.Users.FirstOrDefaultAsync(u => u.Id == ad.UserId)).IsAdmin;
                 if (thisUserAdsCount >= AdsMaxCount && !isThisUserAdmin)
                 {
                     throw new TooManyAdsException();
@@ -159,6 +107,7 @@ namespace MyMakler
                 ad.Id = adId;
                 ad.Rating = 0;
                 ad.PicLink = "Empty";
+                
                 ad.CreationDate = DateTime.Now;
                 ad.DeletionDate = ad.CreationDate.AddDays(AdLifeDays);
                 context.Ads.Add(ad);
@@ -181,7 +130,7 @@ namespace MyMakler
                 {
                     await file.CopyToAsync(fS);
                 }
-                ad.PicLink = PicsDirectory + "\\" + file.FileName;
+                ad.PicLink = file.FileName;
                 context.Ads.Update(ad);
                 await context.SaveChangesAsync();
             }
@@ -223,7 +172,7 @@ namespace MyMakler
                 await context.SaveChangesAsync();
             }
         }
-        public static async Task<AdsAndPagesCount> TryGetAdsListAndPgCount(SortCriteria criterion, bool isASC, string keyWord, int? ratingLow, int? ratingHigh, int pageNumber) //Сортированный список объявлений с необязательным поиском по тексту и фильтром по рейтингу
+        public static async Task<AdsAndPagesCount> TryGetAdsListAndPgCount(SortCriteria criterion, bool isASC, string keyWord, int? ratingLow, int? ratingHigh, int pageNumber, int pageSize) //Сортированный список объявлений с необязательным поиском по тексту и фильтром по рейтингу
         {
             if (ratingHigh.HasValue && ratingLow.HasValue && ratingLow > ratingHigh)
                 (ratingLow, ratingHigh) = (ratingHigh, ratingLow);
@@ -253,12 +202,12 @@ namespace MyMakler
                 }
                 pagesCount = await ads.CountAsync();
                 if (pagesCount > 0)
-                    pagesCount = pagesCount / PageSize + ((pagesCount % PageSize) == 0 ? 0 : 1);
+                    pagesCount = pagesCount / pageSize + ((pagesCount % pageSize) == 0 ? 0 : 1);
                 else
                     pagesCount = 1;
                 if (pageNumber > pagesCount || pageNumber < 1)
                     throw new InvalidPageException();
-                ads = ads.Skip((pageNumber - 1) * PageSize).Take(PageSize);
+                ads = ads.Skip((pageNumber - 1) * pageSize).Take(pageSize);
                 adsList = await ads.ToListAsync();
             }
             return new AdsAndPagesCount { Ads = adsList, PagesCount = pagesCount };
@@ -293,6 +242,27 @@ namespace MyMakler
                 }
                 context.Ads.Update(ad);
                 await context.SaveChangesAsync();
+            }
+        }
+        public static async Task<(string, string, string)> TryGetPic(string picName)/////////////////////////////
+        {
+            using (ApplicationContext context = new ApplicationContext())
+            {
+                if (0 == (await context.Ads.Where(a => a.PicLink == picName).CountAsync()))
+                    throw new DoesNotExistException(typeof(File));
+            }
+            string path = PicsDirectory + "\\" + picName;
+            return (path, "image/" + Path.GetExtension(path).Substring(1), picName);
+        }
+        public static async Task TryResizePic(int height, int width, string picName)/////////////////////////////
+        {
+            using (ApplicationContext context = new ApplicationContext())
+            {
+                if (0 == (await context.Ads.Where(a => a.PicLink == picName).CountAsync()))
+                    throw new DoesNotExistException(typeof(File));
+                Image image = Image.Load(PicsDirectory + "\\" + picName);
+                image.Resize(height, width);
+                image.Save();
             }
         }
     }

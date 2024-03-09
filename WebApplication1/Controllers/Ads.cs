@@ -10,9 +10,9 @@ namespace MyMakler.Controllers
         
         [HttpGet]
         [Route("All")]
-        public async Task<IActionResult> GetAllAds(Logics.SortCriteria criterion, bool isASC, string? keyWord, int? ratingLow, int? ratingHigh, int page = 1)
+        public async Task<IActionResult> GetAllAds(Logics.SortCriteria criterion, bool isASC, string? keyWord, int? ratingLow, int? ratingHigh, int page = 1, int pageSize = 10)
         {
-            var result = await Logics.TryGetAdsListAndPgCount(criterion, isASC, keyWord, ratingLow, ratingHigh, page);
+            var result = await Logics.TryGetAdsListAndPgCount(criterion, isASC, keyWord, ratingLow, ratingHigh, page, pageSize);
             if (result.Ads == null)
                 return StatusCode((int)HttpStatusCode.NoContent, result.PagesCount);
             return Ok(result);
@@ -25,7 +25,7 @@ namespace MyMakler.Controllers
         {
                 await Logics.TryChangeRating(guid, change);
                 return Ok();
-        }        
+        }
     }
     public class AdsAndPagesCount
     {
