@@ -28,9 +28,9 @@ namespace MyMakler.Controllers
         
         [HttpGet]
         [Route("All")]
-        public async Task<IActionResult> GetAllUsers(int page = 1)
+        public async Task<IActionResult> GetAllUsers(int page = 1, int pageSize = 10)
         {
-            var result = await Logics.TryGetUsersList(page);
+            var result = await Logics.TryGetUsersList(page, pageSize);
             if (result == null)
                 return NoContent();
             return Ok(result);
@@ -39,9 +39,9 @@ namespace MyMakler.Controllers
 
         [HttpGet]
         [Route("PgCount")]
-        public async Task<IActionResult> GetUsersPagesCount()
+        public async Task<IActionResult> GetUsersPagesCount(int pageSize = 10)
         {
-            return Ok(await Logics.TryGetUsersPagesCount());
+            return Ok(await Logics.TryGetUsersPagesCount(pageSize));
         }
 
 

@@ -15,7 +15,7 @@ namespace MyMakler.Controllers
 
         [HttpPost]
         [Route("AttachPic")]
-        public async Task<IActionResult> AttachPicToAdvertisement(IFormFile file, Guid adId)
+        public async Task<IActionResult> AttachPicToAdvertisement(IFormFile? file, Guid adId)
         {
             await Logics.TryAttachPic(file, adId);
             return Ok();
@@ -24,12 +24,19 @@ namespace MyMakler.Controllers
 
         [HttpDelete]
         [Route("DetachPic")]
-        public async Task<IActionResult> AttachPicToAdvertisement(Guid adId)
+        public async Task<IActionResult> DetachPicFromAdvertisement(Guid adId)
         {
             await Logics.TryDetachPic(adId);
             return Ok();
         }
 
+        [HttpPut]
+        [Route("ResizePic")]/////////////////////////////////////////////////////////////////////////
+        public async Task<IActionResult> ResizePic(int height, int width, string picName)
+        {
+            await Logics.TryResizePic(height, width, picName);
+            return Ok();
+        }
 
         [HttpDelete]
         [Route("Delete")]
