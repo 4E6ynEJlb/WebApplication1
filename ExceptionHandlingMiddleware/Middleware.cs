@@ -1,17 +1,10 @@
-﻿global using Exceptions;
+﻿using Microsoft.AspNetCore.Http;
 using Newtonsoft.Json;
 using System.Net;
-
-namespace MyMakler
+namespace ExceptionHandlingMiddleware
 {
     public class ExceptionHandlerMiddleware
     {
-        private readonly RequestDelegate _next;
-
-        public ExceptionHandlerMiddleware(RequestDelegate next)
-        {
-            _next = next;
-        }
 
         public async Task Invoke(HttpContext context)
         {

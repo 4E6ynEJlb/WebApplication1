@@ -1,23 +1,27 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-
 namespace MyMakler.Controllers
 {
     [ApiController]
     [Route("[controller]")]
     public class AdsWorkspace : ControllerBase//Работа с объявлениями
     {
+        public AdsWorkspace(ILogics logics) 
+        {
+            _Logics = logics;
+        }
+        private readonly ILogics _Logics;
         [HttpPost]
         [Route("Add")]
         public async Task<IActionResult> AddAdvertisement(Advertisement ad)
         {
-            return Ok(await Logics.TryAddAdvertisement(ad));
+            return Ok(await _Logics.TryAddAdvertisement(ad));
         }
 
         [HttpPost]
         [Route("AttachPic")]
         public async Task<IActionResult> AttachPicToAdvertisement(IFormFile? file, Guid adId)
         {
-            await Logics.TryAttachPic(file, adId);
+            await _Logics.TryAttachPic(file, adId);
             return Ok();
         }
 
@@ -26,15 +30,15 @@ namespace MyMakler.Controllers
         [Route("DetachPic")]
         public async Task<IActionResult> DetachPicFromAdvertisement(Guid adId)
         {
-            await Logics.TryDetachPic(adId);
+            await _Logics.TryDetachPic(adId);
             return Ok();
         }
 
         [HttpPut]
         [Route("ResizePic")]/////////////////////////////////////////////////////////////////////////
-        public async Task<IActionResult> ResizePic(int height, int width, string picName)
+        public async Task<IActionResult> ResizePic(ResizePicArgs args)
         {
-            await Logics.TryResizePic(height, width, picName);
+            await _Logics.TryResizePic(args);
             return Ok();
         }
 
@@ -42,7 +46,7 @@ namespace MyMakler.Controllers
         [Route("Delete")]
         public async Task<IActionResult> DeleteAdvertisement(Guid guid)
         {
-            await Logics.TryDeleteAdvertisement(guid);
+            await _Logics.TryDeleteAdvertisement(guid);
             return Ok();
         }
 
@@ -51,7 +55,7 @@ namespace MyMakler.Controllers
         [Route("Edit")]
         public async Task<IActionResult> EditAdvertisement(Advertisement ad)
         {
-            await Logics.TryEditAdvertisement(ad);
+            await _Logics.TryEditAdvertisement(ad);
             return Ok();
         }
 
@@ -60,7 +64,7 @@ namespace MyMakler.Controllers
         [Route("PersonalAds")]
         public async Task<IActionResult> AdsByUser(Guid guid)
         {
-            var result = await Logics.TryGetPersonalAdsList(guid);
+            var result = await _Logics.TryGetPersonalAdsList(guid);
             if (result == null)
                 return NoContent();
             return Ok(result);

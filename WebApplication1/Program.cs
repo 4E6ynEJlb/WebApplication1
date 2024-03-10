@@ -1,3 +1,6 @@
+global using LogicsLib;
+global using Repos;
+using Microsoft.EntityFrameworkCore;
 
 namespace MyMakler
 {
@@ -5,9 +8,10 @@ namespace MyMakler
     {
         public static void Main(string[] args)
         {
-            Logics.EnsureDirectoryCreated();
-            var builder = WebApplication.CreateBuilder(args);
-
+            var config = new ConfigurationBuilder().AddJsonFile("DbConfiguration.json").SetBasePath(Directory.GetCurrentDirectory()).Build();
+            var builder = WebApplication.CreateBuilder(args);            
+            builder.Services.AddDbContext<ApplicationContext>(options => options.UseSqlServer(config.GetConnectionString("DefaultConnection")));
+            builder.Services.AddScoped<ILogics, Logics>();
             // Add services to the container.
             builder.Services.AddHostedService<Services>();////////////////////////////////////////////
             builder.Services.AddControllers();
@@ -30,9 +34,7 @@ namespace MyMakler
 
 
             app.MapControllers();
-
             app.Run();
-            
         }
     }
 }
