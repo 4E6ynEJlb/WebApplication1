@@ -6,20 +6,23 @@ namespace MyMakler.Controllers
     [Route("[controller]")]
     public class Users : ControllerBase//Работа с пользователями
     {
-        
+        public Users(ILogics logics)
+        {
+            _Logics = logics;
+        }
+        private readonly ILogics _Logics;
         [HttpPost]
         [Route("Add")]
         public async Task<IActionResult> AddUser(User user)
-        {
-            return Ok(await Logics.TryAddUser(user));
+        {            
+            return Ok(await _Logics.TryAddUser(user));
         }
-
         
         [HttpGet]
         [Route("Search")]
         public async Task<IActionResult> SearchUser(string name)
         {
-            var result = await Logics.TrySearchUser(name);
+            var result = await _Logics.TrySearchUser(name);
             if (result == null)
                 return NoContent();
             return Ok(result);
@@ -30,7 +33,7 @@ namespace MyMakler.Controllers
         [Route("All")]
         public async Task<IActionResult> GetAllUsers(int page = 1, int pageSize = 10)
         {
-            var result = await Logics.TryGetUsersList(page, pageSize);
+            var result = await _Logics.TryGetUsersList(page, pageSize);
             if (result == null)
                 return NoContent();
             return Ok(result);
@@ -41,7 +44,7 @@ namespace MyMakler.Controllers
         [Route("PgCount")]
         public async Task<IActionResult> GetUsersPagesCount(int pageSize = 10)
         {
-            return Ok(await Logics.TryGetUsersPagesCount(pageSize));
+            return Ok(await _Logics.TryGetUsersPagesCount(pageSize));
         }
 
 
@@ -49,7 +52,7 @@ namespace MyMakler.Controllers
         [Route("Delete")]
         public async Task<IActionResult> DeleteUser(Guid guid)
         {
-            await Logics.TryDeleteUser(guid);
+            await _Logics.TryDeleteUser(guid);
             return Ok();
         }
 
@@ -58,7 +61,7 @@ namespace MyMakler.Controllers
         [Route("Edit")]
         public async Task<IActionResult> EditUser(User user)
         {
-            await Logics.TryEditUser(user);
+            await _Logics.TryEditUser(user);
             return Ok();
         }    
     }

@@ -1,0 +1,5 @@
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "Data Source=DESKTOP-1EUC064;AttachDbFilename=D:\\TestTaskDex\\TTPrimary.mdf;Integrated Security=True;Trust Server Certificate=True"
+  }
+}
