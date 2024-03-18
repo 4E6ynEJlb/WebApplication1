@@ -3,26 +3,29 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
-using MyMakler;
+using Repos;
 
 #nullable disable
 
-namespace MyMakler.Migrations
+namespace Repos.Migrations
 {
     [DbContext(typeof(ApplicationContext))]
-    partial class ApplicationContextModelSnapshot : ModelSnapshot
+    [Migration("20240317155830_CreateDB")]
+    partial class CreateDB
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "9.0.0-preview.1.24081.2")
+                .HasAnnotation("ProductVersion", "9.0.0-preview.2.24128.4")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
-            modelBuilder.Entity("MyMakler.Advertisement", b =>
+            modelBuilder.Entity("Repos.Advertisement", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -43,11 +46,15 @@ namespace MyMakler.Migrations
 
                     b.Property<string>("PicLink")
                         .IsRequired()
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("nvarchar(max)")
+                        .HasDefaultValue("Empty")
                         .HasColumnName("pic_link");
 
                     b.Property<int>("Rating")
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("int")
+                        .HasDefaultValue(0)
                         .HasColumnName("rating");
 
                     b.Property<string>("Text")
@@ -62,12 +69,14 @@ namespace MyMakler.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("Id");
+
                     b.HasIndex("UserId");
 
-                    b.ToTable("ads");
+                    b.ToTable("ads", (string)null);
                 });
 
-            modelBuilder.Entity("MyMakler.User", b =>
+            modelBuilder.Entity("Repos.User", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -75,29 +84,38 @@ namespace MyMakler.Migrations
                         .HasColumnName("_user_id");
 
                     b.Property<bool>("IsAdmin")
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("bit")
+                        .HasDefaultValue(false)
                         .HasColumnName("is_admin");
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("nvarchar(16)")
+                        .HasColumnType("varchar(16)")
                         .HasColumnName("_user_name");
 
                     b.HasKey("Id");
 
-                    b.ToTable("users");
+                    b.HasIndex("Id")
+                        .IsUnique();
+
+                    b.ToTable("users", (string)null);
                 });
 
-            modelBuilder.Entity("MyMakler.Advertisement", b =>
+            modelBuilder.Entity("Repos.Advertisement", b =>
                 {
-                    b.HasOne("MyMakler.User", "User")
-                        .WithMany()
+                    b.HasOne("Repos.User", "User")
+                        .WithMany("Ads")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Repos.User", b =>
+                {
+                    b.Navigation("Ads");
                 });
 #pragma warning restore 612, 618
         }

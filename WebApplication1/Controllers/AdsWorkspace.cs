@@ -12,9 +12,9 @@ namespace MyMakler.Controllers
         private readonly ILogics _Logics;
         [HttpPost]
         [Route("Add")]
-        public async Task<IActionResult> AddAdvertisement(Advertisement ad)
+        public async Task<IActionResult> AddAdvertisement(AdvInput adInput)
         {
-            return Ok(await _Logics.TryAddAdvertisement(ad));
+            return Ok(await _Logics.TryAddAdvertisement(adInput));
         }
 
         [HttpPost]

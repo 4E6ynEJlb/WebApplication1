@@ -3,10 +3,10 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace MyMakler.Migrations
+namespace Repos.Migrations
 {
     /// <inheritdoc />
-    public partial class create_db : Migration
+    public partial class CreateDB : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -16,8 +16,8 @@ namespace MyMakler.Migrations
                 columns: table => new
                 {
                     _user_id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    _user_name = table.Column<string>(type: "nvarchar(16)", maxLength: 16, nullable: false),
-                    is_admin = table.Column<bool>(type: "bit", nullable: false)
+                    _user_name = table.Column<string>(type: "varchar(16)", nullable: false),
+                    is_admin = table.Column<bool>(type: "bit", nullable: false, defaultValue: false)
                 },
                 constraints: table =>
                 {
@@ -32,8 +32,8 @@ namespace MyMakler.Migrations
                     phone_number = table.Column<int>(type: "int", nullable: false),
                     _user_id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     ad_text = table.Column<string>(type: "nvarchar(512)", maxLength: 512, nullable: false),
-                    pic_link = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    rating = table.Column<int>(type: "int", nullable: false),
+                    pic_link = table.Column<string>(type: "nvarchar(max)", nullable: false, defaultValue: "Empty"),
+                    rating = table.Column<int>(type: "int", nullable: false, defaultValue: 0),
                     creation_date = table.Column<DateTime>(type: "datetime2", nullable: false),
                     deletion_date = table.Column<DateTime>(type: "datetime2", nullable: false)
                 },
@@ -52,6 +52,17 @@ namespace MyMakler.Migrations
                 name: "IX_ads__user_id",
                 table: "ads",
                 column: "_user_id");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ads_ad_id",
+                table: "ads",
+                column: "ad_id");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_users__user_id",
+                table: "users",
+                column: "_user_id",
+                unique: true);
         }
 
         /// <inheritdoc />
