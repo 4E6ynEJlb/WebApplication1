@@ -4,8 +4,8 @@ namespace LogicsLib
 {
     public class ResizePicArgs
     {
-        public int Height;
-        public int Width;
-        public string PicName;
+        public int Height { get; set; }
+        public int Width { get; set; }
+        public string PicName { get; set; }
     }
 }

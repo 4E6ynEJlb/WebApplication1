@@ -13,9 +13,9 @@ namespace MyMakler.Controllers
         private readonly ILogics _Logics;
         [HttpPost]
         [Route("Add")]
-        public async Task<IActionResult> AddUser(User user)
+        public async Task<IActionResult> AddUser(string name, bool isAdmin)
         {            
-            return Ok(await _Logics.TryAddUser(user));
+            return Ok(await _Logics.TryAddUser(name, isAdmin));
         }
         
         [HttpGet]

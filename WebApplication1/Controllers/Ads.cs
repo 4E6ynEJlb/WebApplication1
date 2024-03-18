@@ -1,5 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using System.Net;
+using Swashbuckle.AspNetCore.Filters;
+using Swashbuckle.Swagger.Annotations;
 namespace MyMakler.Controllers
 {
     [ApiController]
@@ -11,7 +13,7 @@ namespace MyMakler.Controllers
             _Logics = logics;
         }
         private readonly ILogics _Logics;
-        [HttpGet]
+        [HttpOptions]
         [Route("All")]
         public async Task<IActionResult> GetAllAds(GetAllAdsArgs args)
         {
@@ -29,5 +31,6 @@ namespace MyMakler.Controllers
                 await _Logics.TryChangeRating(guid, change);
                 return Ok();
         }
+
     }
 }

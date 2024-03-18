@@ -17,7 +17,7 @@ namespace MyMakler.Controllers
         public async Task<PhysicalFileResult> GetPicture(string picName)
         {
             var fileInfo = await _Logics.TryGetPic(picName);
-            return PhysicalFile(fileInfo.Item1, fileInfo.Item2, fileInfo.Item3);
+            return PhysicalFile(fileInfo.Path, fileInfo.Extension, fileInfo.Name);
         }
     }
 }

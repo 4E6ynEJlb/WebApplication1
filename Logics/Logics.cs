@@ -3,22 +3,29 @@ using Microsoft.EntityFrameworkCore;
 using Exceptions;
 using Microsoft.AspNetCore.Http;
 using Aspose.Imaging;
+using Microsoft.Extensions.Configuration;
+using System.Runtime;
 namespace LogicsLib
 {
     public class Logics : ILogics
     {
-        public Logics(ApplicationContext context)
+        public Logics(ApplicationContext context, IConfiguration configuration)
         {
             Context = context;
+            AdsMaxCount = configuration.GetValue<int>("AdsMaxCount");
+            AdLifeDays = configuration.GetValue<int>("AdLifeDays");
+            TicksCount = configuration.GetValue<int>("TicksCount");
+            PicsDirectory = configuration.GetValue<string>("PicsDirectory");
             EnsureDirectoryCreated();
         }
         private readonly ApplicationContext Context;
-        public const int AdsMaxCount = 5;//Максимальное кол-во объявлений для пользователя (игнорируется у админов (это не баг, а фича))
-        public const int AdLifeDays = 10;//Время жизни объявления в бд, устаревшие удаляются из бд каждую минуту (60000мс)
+        public readonly int AdsMaxCount;
+        public readonly int AdLifeDays ;
+        public readonly int TicksCount ;
+        public readonly string PicsDirectory;
         public enum SortCriteria { Rating, CreationDate }//Критерии сортировки
         public enum RatingChange { up, down }//Возможные изменения рейтинга (+1/-1)
-        public const string PicsDirectory = "D:\\TestTaskDex\\Pics";
-        public static void EnsureDirectoryCreated()
+        public void EnsureDirectoryCreated()
         {
             DirectoryInfo drinfo = new DirectoryInfo(PicsDirectory);
             if (!drinfo.Exists)
@@ -26,18 +33,18 @@ namespace LogicsLib
                 drinfo.Create();
             }
         }
-        public void DeleteDetachedPics(CancellationToken token)
+        public async Task DeleteDetachedPics(CancellationToken token)
         {
             while (!token.IsCancellationRequested)
             {
                 try
                 {
-                    DirectoryInfo drinfo = new DirectoryInfo(Logics.PicsDirectory);
+                    DirectoryInfo drinfo = new DirectoryInfo(PicsDirectory);
                     FileInfo[] picsInfo = drinfo.GetFiles();
 
                     foreach (FileInfo picInfo in picsInfo)
                     {
-                        if (Context.Ads.FirstOrDefault(a => a.PicLink == picInfo.Name) == null)
+                        if (await Context.Ads.Where(a => EF.Functions.Like(a.PicLink, $"%/{picInfo.Name}")).CountAsync() == 0)
                         {
                             picInfo.Delete();
                             Console.ForegroundColor = ConsoleColor.Green;
@@ -45,13 +52,15 @@ namespace LogicsLib
                             Console.ResetColor();
                             Console.WriteLine("Pic has been deleted");
                         }
+                        if (token.IsCancellationRequested)
+                            break;
                     }
                     Console.ForegroundColor = ConsoleColor.Green;
                     Console.Write("info: ");
                     Console.ResetColor();
                     Console.WriteLine("End of deletion");
 
-                    Thread.Sleep(60000);
+                    await Task.Delay(TicksCount, token);
                 }
                 catch
                 {
@@ -60,11 +69,9 @@ namespace LogicsLib
                     Console.ResetColor();
                     Console.WriteLine("Deletion error");
                 }
-                if (token.IsCancellationRequested)
-                    break;
             }
         }
-        public void RemoveOldAds(CancellationToken token)//Удаление устаревших объявлений
+        public async Task RemoveOldAds(CancellationToken token)//Удаление устаревших объявлений
         {
             while (!token.IsCancellationRequested)
             {
@@ -79,13 +86,15 @@ namespace LogicsLib
                         Console.Write("info: ");
                         Console.ResetColor();
                         Console.WriteLine("Ad has been removed");
+                        if (token.IsCancellationRequested)
+                            break;
                     }
                     Console.ForegroundColor = ConsoleColor.Green;
                     Console.Write("info: ");
                     Console.ResetColor();
                     Console.WriteLine("End of removation");
 
-                    Thread.Sleep(60000);
+                    await Task.Delay(TicksCount, token);
                 }
                 catch
                 {
@@ -96,9 +105,14 @@ namespace LogicsLib
                 }
             }
         }
-        public async Task<Guid> TryAddUser(User user)//Добавление пользователя
+        public async Task<Guid> TryAddUser(string name, bool isAdmin)//Добавление пользователя
         {
-            user.Id = Guid.NewGuid();
+            User user = new User()
+            {
+                Id = Guid.NewGuid(),
+                Name = name,
+                IsAdmin = isAdmin
+            };
             Context.Users.Add(user);
             await Context.SaveChangesAsync();
 
@@ -150,24 +164,29 @@ namespace LogicsLib
             await Context.SaveChangesAsync();
 
         }
-        public async Task<Guid> TryAddAdvertisement(Advertisement ad)//Добавление объявления
+        public async Task<Guid> TryAddAdvertisement(AdvInput adInput)//Добавление объявления
         {
             Guid adId = Guid.NewGuid();
-            int thisUserAdsCount = await Context.Ads.Where(a => a.UserId == ad.UserId).CountAsync();
-            bool isThisUserAdmin = (await Context.Users.FirstOrDefaultAsync(u => u.Id == ad.UserId)).IsAdmin;
+            int thisUserAdsCount = await Context.Ads.Where(a => a.UserId == adInput.UserId).CountAsync();
+            bool isThisUserAdmin = (await Context.Users.FirstOrDefaultAsync(u => u.Id == adInput.UserId)).IsAdmin;
             if (thisUserAdsCount >= AdsMaxCount && !isThisUserAdmin)
             {
                 throw new TooManyAdsException();
             }
-            if (await Context.Users.FirstOrDefaultAsync(u => u.Id == ad.UserId) == null)
+            if (await Context.Users.FirstOrDefaultAsync(u => u.Id == adInput.UserId) == null)
                 throw new DoesNotExistException(typeof(User));
-            ad.User = null;
-            ad.Id = adId;
-            ad.Rating = 0;
-            ad.PicLink = "Empty";
-
-            ad.CreationDate = DateTime.Now;
-            ad.DeletionDate = ad.CreationDate.AddDays(AdLifeDays);
+            Advertisement ad = new Advertisement()
+            {
+                User = null,
+                Id = adId,
+                Rating = 0,
+                PicLink = "Empty",
+                UserId = adInput.UserId,
+                Text = adInput.Text,
+                Number = adInput.Number,
+                CreationDate = DateTime.Now,
+                DeletionDate = DateTime.Now.AddDays(AdLifeDays),
+            };
             Context.Ads.Add(ad);
             await Context.SaveChangesAsync();
 
@@ -186,7 +205,7 @@ namespace LogicsLib
             {
                 await file.CopyToAsync(fS);
             }
-            ad.PicLink = file.FileName;
+            ad.PicLink = "https://localhost:7183/GetPic/" + file.FileName;
             Context.Ads.Update(ad);
             await Context.SaveChangesAsync();
 
@@ -295,13 +314,13 @@ namespace LogicsLib
             await Context.SaveChangesAsync();
         }
 
-        public async Task<(string, string, string)> TryGetPic(string picName)/////////////////////////////
+        public async Task<PicProps> TryGetPic(string picName)/////////////////////////////
         {
-            if (0 == (await Context.Ads.Where(a => a.PicLink == picName).CountAsync()))
+            if (await Context.Ads.Where(a => EF.Functions.Like(a.PicLink, $"%/{picName}")).CountAsync() == 0)
                 throw new DoesNotExistException(typeof(File));
 
             string path = PicsDirectory + "\\" + picName;
-            return (path, "image/" + Path.GetExtension(path).Substring(1), picName);
+            return new PicProps(path, "image/" + Path.GetExtension(path).Substring(1), picName);
         }
         public async Task TryResizePic(ResizePicArgs args)/////////////////////////////
         {
