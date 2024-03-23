@@ -9,24 +9,20 @@ namespace LogicsLib.Services
             _Logics = serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<ILogics>();
         }
         private ILogics _Logics;
-        private Task DeleteOldAds;
-        public async Task StartAsync(CancellationToken token)
+        public async Task StartAsync(CancellationToken token)//   <*> №11
         {
             Console.ForegroundColor = ConsoleColor.Green;
             Console.Write("info: ");
             Console.ResetColor();
             Console.WriteLine("Starting service DOA");
-            DeleteOldAds = new Task(() => _Logics.RemoveOldAds(token));
-            DeleteOldAds.Start();
-            await Task.CompletedTask;
+            _Logics.RemoveOldAds(token);
         }
-        public async Task StopAsync(CancellationToken token)
+        public async Task StopAsync(CancellationToken token)//   <*> №11
         {
             Console.ForegroundColor = ConsoleColor.Green;
             Console.Write("info: ");
             Console.ResetColor();
             Console.WriteLine("Stopping service DOA");
-            await DeleteOldAds;
         }
     }
 }

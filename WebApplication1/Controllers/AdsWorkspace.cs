@@ -34,14 +34,6 @@ namespace MyMakler.Controllers
             return Ok();
         }
 
-        [HttpPut]
-        [Route("ResizePic")]/////////////////////////////////////////////////////////////////////////
-        public async Task<IActionResult> ResizePic(ResizePicArgs args)
-        {
-            await _Logics.TryResizePic(args);
-            return Ok();
-        }
-
         [HttpDelete]
         [Route("Delete")]
         public async Task<IActionResult> DeleteAdvertisement(Guid guid)

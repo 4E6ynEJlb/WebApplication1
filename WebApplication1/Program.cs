@@ -3,17 +3,17 @@ global using Repos;
 using LogicsLib.Services;
 using Microsoft.EntityFrameworkCore;
 using Swashbuckle.AspNetCore.Filters;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.FileProviders;
 
 namespace MyMakler
 {
     public class Program
     {
         public static void Main(string[] args)
-        {
-            var config = new ConfigurationBuilder().AddJsonFile("DbConfiguration.json").SetBasePath(Directory.GetCurrentDirectory()).Build();
-            var builder = WebApplication.CreateBuilder(args);
-            builder.Configuration.AddJsonFile("ConstsConfiguration.json");
-            builder.Services.AddDbContext<ApplicationContext>(options => options.UseSqlServer(config.GetConnectionString("DefaultConnection")));
+        {            
+            var builder = WebApplication.CreateBuilder();            
+            builder.Services.AddDbContext<ApplicationContext>(options => options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));//   <*> ¹9
             builder.Services.AddScoped<ILogics, Logics>();
             // Add services to the container.
             builder.Services.AddHostedService<DetachedPicsService>();
@@ -28,7 +28,13 @@ namespace MyMakler
             builder.Services.AddSwaggerExamplesFromAssemblyOf<GetAllAdsArgsExample>();
 
             var app = builder.Build();
-
+            app.UseFileServer(new FileServerOptions      //   <*> correct file routing
+            {
+                EnableDirectoryBrowsing = true,
+                FileProvider = new PhysicalFileProvider(builder.Configuration.GetValue<string>("PicsDirectory")),
+                RequestPath = new PathString("/pics"),
+                EnableDefaultFiles = false
+            });
             // Configure the HTTP request pipeline.
             if (app.Environment.IsDevelopment())
             {
