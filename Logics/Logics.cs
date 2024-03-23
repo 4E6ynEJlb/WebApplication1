@@ -12,17 +12,21 @@ namespace LogicsLib
         public Logics(ApplicationContext context, IConfiguration configuration)
         {
             Context = context;
-            AdsMaxCount = configuration.GetValue<int>("AdsMaxCount");
-            AdLifeDays = configuration.GetValue<int>("AdLifeDays");
-            TicksCount = configuration.GetValue<int>("TicksCount");
+            var constsOptions = new ConstsOptions();
+            configuration.GetSection(ConstsOptions.ConstsConfiguration).Bind(constsOptions);//   <*> pattern Options (+ check appsettings.json)
+            AdsMaxCount = constsOptions.AdsMaxCount;
+            AdLifeDays = constsOptions.AdLifeDays;
+            TicksCount = constsOptions.TicksCount;
+            LinkTemplate = constsOptions.LinkTemplate;//   <*> №8
             PicsDirectory = configuration.GetValue<string>("PicsDirectory");
             EnsureDirectoryCreated();
         }
         private readonly ApplicationContext Context;
-        public readonly int AdsMaxCount;
-        public readonly int AdLifeDays ;
-        public readonly int TicksCount ;
-        public readonly string PicsDirectory;
+        private readonly int AdsMaxCount;//   <*> private
+        private readonly int AdLifeDays ;
+        private readonly int TicksCount ;
+        private readonly string PicsDirectory;
+        private readonly string LinkTemplate;
         public enum SortCriteria { Rating, CreationDate }//Критерии сортировки
         public enum RatingChange { up, down }//Возможные изменения рейтинга (+1/-1)
         public void EnsureDirectoryCreated()
@@ -44,7 +48,7 @@ namespace LogicsLib
 
                     foreach (FileInfo picInfo in picsInfo)
                     {
-                        if (await Context.Ads.Where(a => EF.Functions.Like(a.PicLink, $"%/{picInfo.Name}")).CountAsync() == 0)
+                        if (await Context.Ads.Where(a => EF.Functions.Like(a.PicLink, $"%/{picInfo.Name}")).CountAsync(token) == 0)//   <*> graceful shutdown
                         {
                             picInfo.Delete();
                             Console.ForegroundColor = ConsoleColor.Green;
@@ -71,14 +75,14 @@ namespace LogicsLib
                 }
             }
         }
-        public async Task RemoveOldAds(CancellationToken token)//Удаление устаревших объявлений
+        public async Task RemoveOldAds(CancellationToken token)
         {
             while (!token.IsCancellationRequested)
             {
                 try
                 {
 
-                    var removingAds = Context.Ads.Where(a => a.DeletionDate <= DateTime.Now);
+                    var removingAds = await Context.Ads.Where(a => a.DeletionDate <= DateTime.Now).ToListAsync(token);//   <*> gr. SD
                     foreach (Advertisement removingAd in removingAds)
                     {
                         Context.Ads.Remove(removingAd);
@@ -89,6 +93,7 @@ namespace LogicsLib
                         if (token.IsCancellationRequested)
                             break;
                     }
+                    await Context.SaveChangesAsync(token);//   <*> savechanges + gr. SD
                     Console.ForegroundColor = ConsoleColor.Green;
                     Console.Write("info: ");
                     Console.ResetColor();
@@ -105,7 +110,7 @@ namespace LogicsLib
                 }
             }
         }
-        public async Task<Guid> TryAddUser(string name, bool isAdmin)//Добавление пользователя
+        public async Task<Guid> TryAddUser(string name, bool isAdmin)
         {
             User user = new User()
             {
@@ -118,14 +123,14 @@ namespace LogicsLib
 
             return user.Id;
         }
-        public async Task<List<User>> TrySearchUser(string name)//Поиск пользователя по имени (LIKE)
+        public async Task<List<User>> TrySearchUser(string name)
         {
             List<User> result;
             result = await Context.Users.Where(u => EF.Functions.Like(u.Name, $"%{name}%")).ToListAsync();
 
             return result;
         }
-        public async Task<List<User>> TryGetUsersList(int pageNumber, int pageSize)//Все пользователи
+        public async Task<List<User>> TryGetUsersList(int pageNumber, int pageSize)
         {
             List<User> usersList;
             int pagesCount = await Context.Users.CountAsync();
@@ -146,7 +151,7 @@ namespace LogicsLib
                 return 1;
             return pagesCount / pageSize + ((pagesCount % pageSize) == 0 ? 0 : 1);
         }
-        public async Task TryDeleteUser(Guid guid)//Удаление пользователя по ИД
+        public async Task TryDeleteUser(Guid guid)
         {
             if (await Context.Users.FirstOrDefaultAsync(u => u.Id == guid) == null)
                 throw new DoesNotExistException(typeof(User));
@@ -156,7 +161,7 @@ namespace LogicsLib
             await Context.SaveChangesAsync();
 
         }
-        public async Task TryEditUser(User user)//Изменение пользователя
+        public async Task TryEditUser(User user)
         {
             if (await Context.Users.FirstOrDefaultAsync(u => u.Id == user.Id) == null)
                 throw new DoesNotExistException(typeof(User));
@@ -164,7 +169,7 @@ namespace LogicsLib
             await Context.SaveChangesAsync();
 
         }
-        public async Task<Guid> TryAddAdvertisement(AdvInput adInput)//Добавление объявления
+        public async Task<Guid> TryAddAdvertisement(AdvInput adInput)
         {
             Guid adId = Guid.NewGuid();
             int thisUserAdsCount = await Context.Ads.Where(a => a.UserId == adInput.UserId).CountAsync();
@@ -205,7 +210,7 @@ namespace LogicsLib
             {
                 await file.CopyToAsync(fS);
             }
-            ad.PicLink = "https://localhost:7183/GetPic/" + file.FileName;
+            ad.PicLink = LinkTemplate + file.FileName;
             Context.Ads.Update(ad);
             await Context.SaveChangesAsync();
 
@@ -220,7 +225,7 @@ namespace LogicsLib
             await Context.SaveChangesAsync();
 
         }
-        public async Task TryDeleteAdvertisement(Guid guid) //Удаление объявления независимо от его актуальности
+        public async Task TryDeleteAdvertisement(Guid guid) 
         {
             Advertisement ad = new Advertisement { Id = guid };
             if (await Context.Ads.FirstOrDefaultAsync(a => a.Id == guid) == null)
@@ -230,7 +235,7 @@ namespace LogicsLib
             await Context.SaveChangesAsync();
 
         }
-        public async Task TryEditAdvertisement(Advertisement ad) //Редактирование объявления (с защитой от "нечестного" изменения рейтинга)
+        public async Task TryEditAdvertisement(Advertisement ad) 
         {
             Advertisement adInDB = await Context.Ads.FirstOrDefaultAsync(a => a.Id == ad.Id);
             if (adInDB == null)
@@ -241,7 +246,7 @@ namespace LogicsLib
             await Context.SaveChangesAsync();
 
         }
-        public async Task<AdsAndPagesCount> TryGetAdsListAndPgCount(GetAllAdsArgs args) //Сортированный список объявлений с необязательным поиском по тексту и фильтром по рейтингу
+        public async Task<AdsAndPagesCount> TryGetAdsListAndPgCount(GetAllAdsArgs args) 
         {
             int? ratingHigh = args.RatingHigh;
             int? ratingLow = args.RatingLow;
@@ -287,7 +292,7 @@ namespace LogicsLib
 
             return new AdsAndPagesCount { Ads = adsList, PagesCount = pagesCount };
         }
-        public async Task<List<Advertisement>> TryGetPersonalAdsList(Guid guid)//Поиск объявлений конкретного пользователя (по его ид)
+        public async Task<List<Advertisement>> TryGetPersonalAdsList(Guid guid)
         {
             List<Advertisement> adsList;
             if (await Context.Users.FirstOrDefaultAsync(u => u.Id == guid) == null)
@@ -296,7 +301,7 @@ namespace LogicsLib
 
             return adsList;
         }
-        public async Task TryChangeRating(Guid guid, RatingChange change)//Изменение (теперь уже "честное") рейтинга на 1 
+        public async Task TryChangeRating(Guid guid, RatingChange change) 
         {
             Advertisement? ad = await Context.Ads.FirstOrDefaultAsync(a => a.Id == guid);
             if (ad == null)
@@ -312,24 +317,6 @@ namespace LogicsLib
             }
             Context.Ads.Update(ad);
             await Context.SaveChangesAsync();
-        }
-
-        public async Task<PicProps> TryGetPic(string picName)/////////////////////////////
-        {
-            if (await Context.Ads.Where(a => EF.Functions.Like(a.PicLink, $"%/{picName}")).CountAsync() == 0)
-                throw new DoesNotExistException(typeof(File));
-
-            string path = PicsDirectory + "\\" + picName;
-            return new PicProps(path, "image/" + Path.GetExtension(path).Substring(1), picName);
-        }
-        public async Task TryResizePic(ResizePicArgs args)/////////////////////////////
-        {
-            if (0 == (await Context.Ads.Where(a => a.PicLink == args.PicName).CountAsync()))
-                throw new DoesNotExistException(typeof(File));
-            Image image = Image.Load(PicsDirectory + "\\" + args.PicName);
-            image.Resize(args.Width, args.Height);
-            image.Save();
-
-        }
+        }        
     }
 }

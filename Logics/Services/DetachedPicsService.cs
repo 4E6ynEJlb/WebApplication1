@@ -9,24 +9,20 @@ namespace LogicsLib.Services
             _Logics = serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<ILogics>();
         }
         private ILogics _Logics;
-        private Task DeleteDetachedPics;
-        public async Task StartAsync(CancellationToken token)
+        public async Task StartAsync(CancellationToken token)//   <*> №11
         {
             Console.ForegroundColor = ConsoleColor.Green;
             Console.Write("info: ");
             Console.ResetColor();
             Console.WriteLine("Starting service DPS");
-            DeleteDetachedPics = new Task(() => _Logics.DeleteDetachedPics(token));
-            DeleteDetachedPics.Start();
-            await Task.CompletedTask;
+            _Logics.DeleteDetachedPics(token);
         }
-        public async Task StopAsync(CancellationToken token)
+        public async Task StopAsync(CancellationToken token)//   <*> №11
         {
             Console.ForegroundColor = ConsoleColor.Green;
             Console.Write("info: ");
             Console.ResetColor();
             Console.WriteLine("Stopping service DPS");
-            await DeleteDetachedPics;
         }
     }
 }

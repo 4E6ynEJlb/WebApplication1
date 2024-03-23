@@ -26,8 +26,6 @@ namespace LogicsLib
         Task<AdsAndPagesCount> TryGetAdsListAndPgCount(GetAllAdsArgs args); //Сортированный список объявлений с необязательным поиском по тексту и фильтром по рейтингу
         Task<List<Advertisement>> TryGetPersonalAdsList(Guid guid);//Поиск объявлений конкретного пользователя (по его ид)
         Task TryChangeRating(Guid guid, RatingChange change);//Изменение (теперь уже "честное") рейтинга на 1 
-        Task<PicProps> TryGetPic(string picName);/////////////////////////////
-        Task TryResizePic(ResizePicArgs args);/////////////////////////////
         Task DeleteDetachedPics(CancellationToken token);
         Task RemoveOldAds(CancellationToken token);//Удаление устаревших объявлений
     }
